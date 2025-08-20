@@ -1,70 +1,93 @@
-# Kişisel Web Sitesi
+# Personal Portfolio Website
 
-Bu proje, kişisel web sitenizi oluşturmak için geliştirilmiş bir Laravel uygulamasıdır. Web sitesi, hakkımda, deneyimlerim, eğitimlerim, projelerim ve blog yazılarım gibi bilgileri içermektedir.
+A Laravel application developed to create a personal portfolio website. This website showcases information about me, my professional experience, education, projects, and a blog.
 
-## Kurulum
+## Features
 
-### Gereksinimler
+- **About Me:** Personal information and a link to my CV.
+- **Experience:** A chronological list of my work experience.
+- **Education:** A chronological list of my educational background.
+- **Projects:** Details of my past projects.
+- **Blog:** A list of my recent blog posts with a link to view all posts.
+- **Contact:** My contact information and social media links.
 
-- PHP 8.2 veya üstü
+## Getting Started
+
+### Prerequisites
+
+- PHP 8.2 or higher
 - Composer
-- Filament
-- MySQL veya başka bir veritabanı sunucusu
+- A database server (e.g., MySQL)
+- Filament PHP 3.0.0
 
-### Adımlar
+### Installation
 
-1. Depoyu klonlayın:
+Follow these steps to get a local copy of the project up and running.
 
+1.  Clone the repository:
     ```sh
-    git clone https://github.com/kullaniciadi/proje-adi.git](https://github.com/yusuferdemyamali/portfolio-web.git
+    git clone [https://github.com/yusuferdemyamali/portfolio-web.git](https://github.com/yusuferdemyamali/portfolio-web.git)
     ```
 
-2. Gerekli bağımlılıkları yükleyin
+2.  Navigate to the project directory:
+    ```sh
+    cd portfolio-web
+    ```
 
-3. `.env` dosyasını oluşturun ve gerekli yapılandırmaları yapın:
+3.  Install the required dependencies:
+    ```sh
+    composer install
+    ```
 
-4. Veritabanını oluşturun ve yapılandırın:
+4.  Create and configure your `.env` file:
+    ```sh
+    cp .env.example .env
+    # Edit the .env file with your database configuration
+    ```
 
+5.  Generate the application key:
+    ```sh
+    php artisan key:generate
+    ```
+
+6.  Run database migrations and seed the database:
     ```sh
     php artisan migrate --seed
     ```
 
-5. Sunucuyu başlatın:
-
+7.  Start the local development server:
     ```sh
     php artisan serve
     ```
 
-## Kullanım
+You can now access the application at `http://127.0.0.1:8000`.
 
-### Ana Sayfa
+## Contribution
 
-Ana sayfa, hakkımda bilgileri, deneyimlerim, eğitimlerim, projelerim ve son blog yazılarımı içermektedir.
+Contributions are what make the open-source community such an amazing place to learn, inspire, and create. Any contributions you make are **greatly appreciated**.
 
-### Hakkımda
+1.  Fork the Project
+2.  Create your Feature Branch (`git checkout -b feature/AmazingFeature`)
+3.  Commit your Changes (`git commit -m 'Add some AmazingFeature'`)
+4.  Push to the Branch (`git push origin feature/AmazingFeature`)
+5.  Open a Pull Request
 
-Bu bölümde, kendimle ilgili bilgileri ve CV'mi bulabilirsiniz.
+---
 
-### Deneyimler
+**Built With**
 
-Bu bölümde, iş deneyimlerim kronolojik olarak listelenmiştir.
+* [Laravel](https://laravel.com/) - The PHP Framework for Web Artisans
+* [Filament](https://filamentphp.com/) - The elegant TALL stack admin panel for Laravel
 
-### Eğitim
+---
 
-Bu bölümde, eğitim geçmişim kronolojik olarak listelenmiştir.
+**License**
 
-### Projeler
+Distributed under the MIT License. See `LICENSE` for more information.
 
-Bu bölümde, geçmiş projelerim ve bu projelere ait detaylar bulunmaktadır.
+---
 
-### Blog
+**Contact**
 
-Bu bölümde, son blog yazılarım listelenmiştir. Tüm blog yazılarını görüntülemek için bir bağlantı da mevcuttur.
-
-### İletişim
-
-Bu bölümde, iletişim bilgilerim ve sosyal medya hesaplarım bulunmaktadır.
-
-## Katkıda Bulunma
-
-Katkıda bulunmak isterseniz, lütfen bir pull request gönderin veya bir issue açın.
+* **Yusuf Erdem Yamalı** - yusuferdem.dev@gmail.com
+* Project Link: https://yusufyamali.me
