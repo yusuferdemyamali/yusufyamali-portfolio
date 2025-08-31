@@ -17,10 +17,6 @@ RUN curl -L -o swoole.tar.gz https://github.com/swoole/swoole-src/archive/refs/t
     && make install \
     && docker-php-ext-enable swoole
 
-# Node.js 18 (Vite compatible) and Yarn installation
-RUN curl -fsSL https://deb.nodesource.com/setup_18.x | bash - \
-    && apt-get install -y nodejs \
-    && npm install -g yarn
 
 # Composer installation
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
@@ -37,9 +33,6 @@ RUN mkdir -p bootstrap/cache storage/app storage/framework/cache/data \
 # Install Composer dependencies (without post-scripts)
 RUN composer install --no-dev --optimize-autoloader --no-interaction --prefer-dist --no-scripts
 
-# Node files (cache for Vite build)
-COPY package.json yarn.lock ./
-RUN yarn install --frozen-lockfile
 
 # Copy the rest of the project files
 COPY . .
@@ -47,8 +40,6 @@ COPY . .
 # Run Composer post-scripts
 RUN composer dump-autoload --optimize
 
-# Vite build
-RUN yarn build
 
 # Laravel config cache (to be done at runtime, not during build)
 RUN php artisan config:clear \
@@ -71,4 +62,4 @@ php artisan view:cache\n\
 exec php artisan octane:start --server=swoole --host=0.0.0.0 --port=9000\n\
 ' > /start.sh && chmod +x /start.sh
 
-CMD ["sh", "-c", "echo 'APP_KEY:' $APP_KEY && php artisan config:cache && php artisan route:cache && php artisan view:cache && php artisan octane:start --server=swoole --host=0.0.0.0 --port=9000"]
+CMD ["sh", "-c", "echo 'APP_KEY:' $APP_KEY && php artisan config:cache && php artisan route:cache && php artisan view:cache && php artisan octane:start --server=swoole --host=0.0.0.0 --port=9000"]""
