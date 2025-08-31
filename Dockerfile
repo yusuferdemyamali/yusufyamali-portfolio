@@ -37,7 +37,7 @@ RUN mkdir -p bootstrap/cache storage/app storage/framework/cache/data \
     storage/framework/sessions storage/framework/views storage/logs
 
 # Install composer dependencies (vendor oluşacak)
-RUN composer install --no-dev --optimize-autoloader --no-interaction --prefer-dist
+RUN composer install --no-dev --optimize-autoloader --no-interaction --prefer-dist --no-scripts
 
 # Clear Laravel cache (artık vendor var)
 RUN php artisan config:clear \
@@ -48,7 +48,7 @@ RUN php artisan config:clear \
 # -------------------------
 # Install composer dependencies (post-scripts çalışacak)
 # -------------------------
-RUN composer install --no-dev --optimize-autoloader --no-interaction --prefer-dist
+RUN composer install --no-dev --optimize-autoloader --no-interaction --prefer-dist --no-scripts
 
 # -------------------------
 # File permissions
