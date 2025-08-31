@@ -38,9 +38,10 @@ RUN chown -R www-data:www-data storage bootstrap/cache \
     && chmod -R 775 storage bootstrap/cache
 
 # 8️⃣ Artisan optimize komutları (opsiyonel ama önerilir)
-RUN php artisan config:cache \
-    && php artisan route:cache \
-    && php artisan view:cache
+# RUN php artisan config:cache \
+#     && php artisan route:cache \
+#     && php artisan view:cache
+
 
 # 9️⃣ Container port
 EXPOSE 9000
