@@ -1,80 +1,74 @@
-# ----- 1. Aşama: Bağımlılıkları Kurma ve Uygulamayı Hazırlama -----
-# Daha geniş paket desteği için Debian tabanlı bir PHP CLI imajı kullanıyoruz.
-FROM php:8.3-cli AS build
+FROM php:8.3-cli AS base
 
-# Sistemin paket listesini güncelliyoruz.
+# System packages and PHP extensions
 RUN apt-get update && apt-get install -y \
-    git \
-    libzip-dev \
-    libjpeg-dev \
-    libpng-dev \
-    libicu-dev \
-    libonig-dev \
-    unzip
+    git unzip curl libpng-dev libonig-dev libxml2-dev \
+    libzip-dev libpq-dev libcurl4-openssl-dev libssl-dev \
+    zlib1g-dev libicu-dev g++ libevent-dev procps \
+    && docker-php-ext-install pdo pdo_mysql pdo_pgsql mbstring zip exif pcntl bcmath sockets intl
 
-# Gerekli PHP uzantılarını yüklüyoruz.
-RUN docker-php-ext-install pdo_mysql gd zip intl mbstring
+# Swoole is installed from GitHub
+RUN curl -L -o swoole.tar.gz https://github.com/swoole/swoole-src/archive/refs/tags/v5.1.0.tar.gz \
+    && tar -xf swoole.tar.gz \
+    && cd swoole-src-5.1.0 \
+    && phpize \
+    && ./configure \
+    && make -j$(nproc) \
+    && make install \
+    && docker-php-ext-enable swoole
 
-WORKDIR /app
+# Node.js 18 (Vite compatible) and Yarn installation
+RUN curl -fsSL https://deb.nodesource.com/setup_18.x | bash - \
+    && apt-get install -y nodejs \
+    && npm install -g yarn
 
-# Composer'ı bu aşamada kuruyoruz.
-COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
+# Composer installation
+COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
-# Projenin bağımlılıklarını kurmak için `composer.json` ve `composer.lock` dosyalarını kopyala.
-COPY composer.json composer.lock ./
+WORKDIR /var/www
 
-# Bağımlılıkları kur.
-RUN composer install --no-dev --no-autoloader --optimize-autoloader
+# Copy composer files and artisan file
+COPY composer.json composer.lock artisan ./
 
-# Gerekli tüm dosyaları imaja kopyala.
+# Create Laravel's basic directory structure
+RUN mkdir -p bootstrap/cache storage/app storage/framework/cache/data \
+    storage/framework/sessions storage/framework/views storage/logs
+
+# Install Composer dependencies (without post-scripts)
+RUN composer install --no-dev --optimize-autoloader --no-interaction --prefer-dist --no-scripts
+
+# Node files (cache for Vite build)
+COPY package.json yarn.lock ./
+RUN yarn install --frozen-lockfile
+
+# Copy the rest of the project files
 COPY . .
 
-# Laravel'in autoloader'ını optimize et.
+# Run Composer post-scripts
 RUN composer dump-autoload --optimize
 
-# ----- 2. Aşama: Üretim (Production) İçin Hafif Bir Nginx İmajı Oluşturma -----
-FROM php:8.3-fpm
+# Vite build
+RUN yarn build
 
-# Gerekli Debian paketlerini yüklüyoruz.
-RUN apt-get update && apt-get install -y \
-    nginx \
-    supervisor \
-    libzip-dev \
-    libjpeg-dev \
-    libpng-dev \
-    libicu-dev \
-    libonig-dev \
-    unzip \
-    mariadb-client-compat
+# Laravel config cache (to be done at runtime, not during build)
+RUN php artisan config:clear \
+ && php artisan route:clear \
+ && php artisan view:clear
 
-# PHP uzantılarını tekrar yüklüyoruz.
-RUN docker-php-ext-install pdo_mysql gd zip intl mbstring
+# File permissions
+RUN chown -R www-data:www-data /var/www \
+ && chmod -R 775 /var/www/storage /var/www/bootstrap/cache
 
+EXPOSE 9000
 
-# Laravel'in çalışacağı kullanıcıyı ve grubu oluştur.
-RUN useradd -ms /bin/bash laravel
+# Startup script
+RUN echo '#!/bin/bash\n\
+# Cache configurations after environment variables are loaded\n\
+php artisan config:cache\n\
+php artisan route:cache\n\
+php artisan view:cache\n\
+# Start the server\n\
+exec php artisan octane:start --server=swoole --host=0.0.0.0 --port=9000\n\
+' > /start.sh && chmod +x /start.sh
 
-# Uygulamanın dizinini ayarla ve gerekli izinleri ver.
-WORKDIR /var/www/html
-COPY --from=build --chown=laravel:laravel /app .
-
-# Depolama (storage) ve cache klasörlerine yazma izinlerini ver.
-RUN chown -R laravel:laravel /var/www/html/storage \
-    && chown -R laravel:laravel /var/www/html/bootstrap/cache \
-    && chmod -R 775 /var/www/html/storage \
-    && chmod -R 775 /var/www/html/bootstrap/cache
-
-# PHP-FPM, Nginx ve Supervisor yapılandırma dosyalarını kopyala.
-COPY docker/nginx.conf /etc/nginx/sites-available/default
-COPY docker/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
-COPY docker/php.ini /etc/php/8.3/fpm/php.ini
-
-# Varsayılan Nginx ayarlarını sil ve kendi ayarlarımızı etkinleştir.
-RUN rm /etc/nginx/sites-enabled/default \
-    && ln -s /etc/nginx/sites-available/default /etc/nginx/sites-enabled/default
-
-# Portu dışarıya aç.
-EXPOSE 80
-
-# Supervisor'ı başlatarak PHP-FPM ve Nginx servislerini çalıştır.
-CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
+CMD ["sh", "-c", "echo 'APP_KEY:' $APP_KEY && php artisan config:cache && php artisan route:cache && php artisan view:cache && php artisan octane:start --server=swoole --host=0.0.0.0 --port=9000"]
