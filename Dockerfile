@@ -2,12 +2,13 @@
 FROM composer:2 AS build
 WORKDIR /app
 COPY composer.json composer.lock ./
+# Bağımlılıkları kur. "build" aşamasında composer'ın çalışması için intl'e ihtiyacı var.
 RUN composer install --no-dev --no-autoloader --optimize-autoloader
 COPY . .
 RUN composer dump-autoload --optimize
 
 # ----- 2. Aşama: Üretim (Production) İçin Hafif Bir Nginx İmajı Oluşturma -----
-FROM php:8.1-fpm-alpine
+FROM php:8.3-fpm-alpine
 
 # Gerekli PHP uzantılarını ve sistem bağımlılıklarını kur
 # "intl-dev" paketini ekleyerek eksik olan "intl" uzantısını yüklüyoruz.
