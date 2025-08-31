@@ -45,10 +45,11 @@ RUN apt-get update && apt-get install -y \
     libicu-dev \
     libonig-dev \
     unzip \
-    mysql-client
+    mariadb-client-compat
 
 # PHP uzantılarını tekrar yüklüyoruz.
 RUN docker-php-ext-install pdo_mysql gd zip intl mbstring
+
 
 # Laravel'in çalışacağı kullanıcıyı ve grubu oluştur.
 RUN useradd -ms /bin/bash laravel
