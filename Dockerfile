@@ -17,7 +17,6 @@ RUN curl -L -o swoole.tar.gz https://github.com/swoole/swoole-src/archive/refs/t
     && make install \
     && docker-php-ext-enable swoole
 
-
 # Composer installation
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
@@ -26,22 +25,26 @@ WORKDIR /var/www
 # Copy composer files and artisan file
 COPY composer.json composer.lock artisan ./
 
+# Copy .env file early to prevent build errors
+COPY .env ./
+
 # Create Laravel's basic directory structure
 RUN mkdir -p bootstrap/cache storage/app storage/framework/cache/data \
     storage/framework/sessions storage/framework/views storage/logs
 
-# Install Composer dependencies (without post-scripts)
-RUN composer install --no-dev --optimize-autoloader --no-interaction --prefer-dist --no-scripts
+# Clear cached config before composer install
+RUN php artisan config:clear || true
 
+# Install Composer dependencies
+RUN composer install --no-dev --optimize-autoloader --no-interaction --prefer-dist
 
 # Copy the rest of the project files
 COPY . .
 
-# Run Composer post-scripts
+# Run Composer post-autoload scripts
 RUN composer dump-autoload --optimize
 
-
-# Laravel config cache (to be done at runtime, not during build)
+# Laravel cache clear (to ensure clean state)
 RUN php artisan config:clear \
  && php artisan route:clear \
  && php artisan view:clear
@@ -54,12 +57,10 @@ EXPOSE 9000
 
 # Startup script
 RUN echo '#!/bin/bash\n\
-# Cache configurations after environment variables are loaded\n\
 php artisan config:cache\n\
 php artisan route:cache\n\
 php artisan view:cache\n\
-# Start the server\n\
 exec php artisan octane:start --server=swoole --host=0.0.0.0 --port=9000\n\
 ' > /start.sh && chmod +x /start.sh
 
-CMD ["sh", "-c", "echo 'APP_KEY:' $APP_KEY && php artisan config:cache && php artisan route:cache && php artisan view:cache && php artisan octane:start --server=swoole --host=0.0.0.0 --port=9000"]""
+CMD ["sh", "/start.sh"]
