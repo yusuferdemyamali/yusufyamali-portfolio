@@ -59,6 +59,7 @@ RUN apk add --no-cache \
     freetype \
     libxml2 \
     oniguruma \
+    zlib-dev \
     && docker-php-ext-install \
     gd \
     intl \
