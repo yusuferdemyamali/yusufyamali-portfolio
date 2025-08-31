@@ -30,21 +30,20 @@ WORKDIR /var/www
 
 # -------------------------
 # Copy all project files
-# -------------------------
 COPY . .
 
-# -------------------------
 # Create storage & cache directories
-# -------------------------
 RUN mkdir -p bootstrap/cache storage/app storage/framework/cache/data \
     storage/framework/sessions storage/framework/views storage/logs
 
-# -------------------------
-# Clear config cache to ensure .env is used
-# -------------------------
+# Install composer dependencies (vendor oluşacak)
+RUN composer install --no-dev --optimize-autoloader --no-interaction --prefer-dist
+
+# Clear Laravel cache (artık vendor var)
 RUN php artisan config:clear \
     && php artisan route:clear \
     && php artisan view:clear
+
 
 # -------------------------
 # Install composer dependencies (post-scripts çalışacak)
