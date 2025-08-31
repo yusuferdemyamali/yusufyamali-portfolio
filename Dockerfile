@@ -7,7 +7,7 @@ RUN apt-get update && apt-get install -y \
     zlib1g-dev libicu-dev g++ libevent-dev procps \
     && docker-php-ext-install pdo pdo_mysql pdo_pgsql mbstring zip exif pcntl bcmath sockets intl
 
-# Swoole is installed from GitHub
+# Swoole
 RUN curl -L -o swoole.tar.gz https://github.com/swoole/swoole-src/archive/refs/tags/v5.1.0.tar.gz \
     && tar -xf swoole.tar.gz \
     && cd swoole-src-5.1.0 \
@@ -17,41 +17,29 @@ RUN curl -L -o swoole.tar.gz https://github.com/swoole/swoole-src/archive/refs/t
     && make install \
     && docker-php-ext-enable swoole
 
-# Composer installation
+# Composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
 WORKDIR /var/www
 
-# Copy composer files and artisan file
-COPY composer.json composer.lock artisan ./
+# **Tüm proje dosyalarını kopyala**
+COPY . .
 
-# Copy .env file early to prevent build errors
-COPY .env ./
-
-# Create Laravel's basic directory structure
+# Laravel storage ve bootstrap/cache oluştur
 RUN mkdir -p bootstrap/cache storage/app storage/framework/cache/data \
     storage/framework/sessions storage/framework/views storage/logs
 
-# Clear cached config before composer install
-RUN php artisan config:clear || true
-
-# Install Composer dependencies
+# Composer dependencies
 RUN composer install --no-dev --optimize-autoloader --no-interaction --prefer-dist
 
-# Copy the rest of the project files
-COPY . .
-
-# Run Composer post-autoload scripts
-RUN composer dump-autoload --optimize
-
-# Laravel cache clear (to ensure clean state)
+# Laravel cache temizleme
 RUN php artisan config:clear \
- && php artisan route:clear \
- && php artisan view:clear
+    && php artisan route:clear \
+    && php artisan view:clear
 
-# File permissions
+# Dosya izinleri
 RUN chown -R www-data:www-data /var/www \
- && chmod -R 775 /var/www/storage /var/www/bootstrap/cache
+    && chmod -R 775 /var/www/storage /var/www/bootstrap/cache
 
 EXPOSE 9000
 
