@@ -1,5 +1,5 @@
 # 1️⃣ Base image
-FROM php:8.3-fpm-alpine
+FROM php:8.2-fpm-alpine
 
 # 2️⃣ Sistem paketleri ve PHP eklentileri
 RUN apk add --no-cache \
@@ -9,7 +9,6 @@ RUN apk add --no-cache \
         libzip-dev \
         oniguruma-dev \
         curl \
-        curl-dev \
         icu-dev \
         npm \
         nodejs \
@@ -24,18 +23,27 @@ WORKDIR /var/www/html
 # 5️⃣ Proje dosyalarını kopyala
 COPY . .
 
+# 5.5️⃣ .env dosyası ve database klasörü
+# Eğer local .env dosyan yoksa .env.example kullanabilirsin
+COPY .env.example .env
+RUN mkdir -p database \
+    && chown -R www-data:www-data database
+
 # 6️⃣ Composer ile bağımlılıkları yükle
-RUN composer install --no-dev --optimize-autoloader
+# --no-scripts kullanırsak package:discover sırasında DB hatası çıkmaz
+RUN composer install --no-dev --optimize-autoloader --no-scripts
 
 # 7️⃣ Storage ve cache izinleri
 RUN chown -R www-data:www-data storage bootstrap/cache \
     && chmod -R 775 storage bootstrap/cache
 
-# 8️⃣ Laravel key generate (opsiyonel, dev için)
-# RUN php artisan key:generate
+# 8️⃣ Artisan optimize komutları (opsiyonel ama önerilir)
+RUN php artisan config:cache \
+    && php artisan route:cache \
+    && php artisan view:cache
 
-# 9️⃣ Port (container port)
+# 9️⃣ Container port
 EXPOSE 9000
 
-# 10️⃣ PHP-FPM başlat
+# 🔟 PHP-FPM başlat
 CMD ["php-fpm"]
