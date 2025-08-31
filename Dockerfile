@@ -1,111 +1,54 @@
-# --- 1. Aşama: Bağımlılıkları Kur (Builder) ---
-# PHP 8.2 ve Composer için temel bir imaj kullanıyoruz. Projenize göre PHP sürümünü (8.1, 8.3 vb.) değiştirebilirsiniz.
-FROM composer:2 as builder
+# ----- 1. Aşama: Bağımlılıkları Kurma ve Uygulamayı Hazırlama -----
+FROM composer:2 AS build
 
-# Sistem bağımlılıklarını ve Laravel için gerekli PHP eklentilerini kur
-# Alpine Linux tabanlı olduğu için 'apk' kullanıyoruz.
-RUN apk add --no-cache \
-    libpng-dev \
-    libzip-dev \
-    libjpeg-turbo-dev \
-    oniguruma-dev \
-    libxml2-dev \
-    freetype-dev \
-    && docker-php-ext-configure gd --with-freetype --with-jpeg \
-    && docker-php-ext-install \
-    gd \
-    intl \
-    bcmath \
-    opcache \
-    pdo \
-    pdo_mysql \
-    zip \
-    exif \
-    pcntl
-
-# Çalışma dizinini ayarla
+# Docker imajı içinde projenin yer alacağı dizini ayarla
 WORKDIR /app
 
-# Önce sadece bağımlılık dosyalarını kopyala. Bu sayede, kod değişse bile
-# bağımlılıklar değişmediği sürece bu katman önbellekten kullanılır ve build hızlanır.
+# Projenin bağımlılıklarını kurmak için `composer.lock` ve `composer.json` dosyalarını kopyala
 COPY composer.json composer.lock ./
 
-# Composer bağımlılıklarını kur (production için optimize edilmiş şekilde)
-RUN composer install --prefer-dist --no-scripts --no-dev --no-autoloader --no-progress
+# Bağımlılıkları kur
+RUN composer install --no-dev --no-autoloader --optimize-autoloader
 
-# Tüm uygulama kodunu kopyala
+# Gerekli tüm dosyaları imaja kopyala
 COPY . .
 
-# Autoloader'ı oluştur ve scriptleri çalıştır
-RUN composer dump-autoload --optimize && \
-    composer run-script post-install-cmd --no-dev
+# Laravel'in autoloader'ını optimize et
+RUN composer dump-autoload --optimize
 
-# Laravel'i production için optimize et
-RUN php artisan config:cache && \
-    php artisan route:cache && \
-    php artisan view:cache
+# ----- 2. Aşama: Üretim (Production) İçin Hafif Bir Nginx İmajı Oluşturma -----
+FROM php:8.1-fpm-alpine
 
-
-# --- 2. Aşama: Production Imajı (Final) ---
-# Daha küçük ve güvenli bir temel imaj kullanıyoruz.
-FROM php:8.2-fpm-alpine as final
-
-# Builder aşamasında kurulan PHP eklentilerini burada da kuruyoruz.
-# Sadece çalışma zamanında (runtime) gerekli olanları ekliyoruz.
+# Gerekli PHP uzantılarını ve sistem bağımlılıklarını kur
+# (Örnek olarak, MySQL, GD, Zip uzantıları eklenmiştir. Projenize göre düzenleyebilirsiniz.)
 RUN apk add --no-cache \
-    libzip \
-    libpng \
-    libjpeg-turbo \
-    freetype \
-    libxml2 \
-    oniguruma \
-    zlib-dev \
-    && docker-php-ext-install \
-    gd \
-    intl \
-    bcmath \
-    opcache \
-    pdo \
-    pdo_mysql \
-    zip \
-    exif \
-    pcntl
+    libzip-dev \
+    libjpeg-turbo-dev \
+    libpng-dev \
+    mysql-client \
+    oniguruma-dev \
+    && docker-php-ext-install pdo_mysql exif gd zip
 
-# Uygulama için www-data kullanıcısını ve grubunu ayarla
-RUN addgroup -g 1000 -S www-data && \
-    adduser -u 1000 -S www-data -G www-data
+# Nginx'i ve ilgili araçları kur
+RUN apk add --no-cache nginx supervisor
 
-# Güvenlik için PHP-FPM'in root olarak çalışmasını engelle
-COPY --from=builder /usr/local/etc/php-fpm.d/zz-docker.conf /usr/local/etc/php-fpm.d/zz-docker.conf
+# Laravel'in çalışacağı kullanıcıyı ve grubu oluştur
+RUN addgroup -S laravel && adduser -S laravel -G laravel
 
-# Builder aşamasında derlenen uygulama dosyalarını kopyala
+# Uygulamanın dizinini ayarla ve gerekli izinleri ver
 WORKDIR /var/www/html
-COPY --from=builder --chown=www-data:www-data /app .
+COPY --from=build --chown=laravel:laravel /app .
 
-# Gerekli dizinlerin yazma izinlerini ayarla
-RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache && \
-    chmod -R 775 /var/www/html/storage /var/www/html/bootstrap/cache
+# Depolama (storage) ve cache klasörlerine yazma izinlerini ver
+RUN chmod -R 775 storage bootstrap/cache
 
-# PHP-FPM portunu dışarıya aç
-EXPOSE 9000
+# PHP-FPM, Nginx ve Supervisor yapılandırma dosyalarını kopyala
+COPY docker/nginx.conf /etc/nginx/http.d/default.conf
+COPY docker/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+COPY docker/php.ini /usr/local/etc/php/php.ini
 
-# Container çalıştığında PHP-FPM servisini başlat
-CMD ["php-fpm"]
-
-
-# --- 3. Aşama: Web Sunucusu (Nginx) ---
-# Nginx için küçük bir imaj kullanıyoruz.
-FROM nginx:stable-alpine
-
-# Nginx konfigurasyon dosyasını kopyala
-# Bu dosyayı bir sonraki adımda oluşturacağız.
-COPY nginx.conf /etc/nginx/conf.d/default.conf
-
-# Uygulamanın public dizinindeki dosyaları Nginx'in sunacağı dizine kopyala
-COPY --from=final /var/www/html/public /var/www/html/public
-
-# Nginx portunu dışarıya aç
+# Portu dışarıya aç
 EXPOSE 80
 
-# Container çalıştığında Nginx'i başlat
-CMD ["nginx", "-g", "daemon off;"]
+# Supervisor'ı başlatarak PHP-FPM ve Nginx servislerini çalıştır
+CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
